@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.json">
+<title>Ready To Leave</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#0f172a;color:#fff;max-width:800px;margin:auto;padding:16px} .card{background:#1e293b;border-radius:16px;padding:16px;margin-bottom:12px} input,select,button{width:100%;padding:12px;margin-top:6px;border-radius:10px;border:none} button{background:#2563eb;color:#fff} .row{display:flex;gap:8px}.row>*{flex:1} .task{background:#334155;padding:10px;border-radius:10px;margin:8px 0}.timeline{border-left:2px solid #475569;padding-left:12px;margin-left:8px}.progress{height:10px;background:#475569;border-radius:99px;overflow:hidden}.fill{height:100%;background:#22c55e}.small{opacity:.8;font-size:.9em}
+</style>
+</head><body>
+<h1>🏠 Ready To Leave</h1>
+<div class='card'><h2 id='latest'>--:--</h2><div>Latest Start Time</div></div>
+<div class='card'>
+<select id='event'></select>
+<input type='time' id='arrival'>
+<input type='number' id='travel' value='20' placeholder='Travel minutes'>
+<button onclick='newPlan()'>Generate Plan</button>
+</div>
+<div class='card'><div id='status'></div></div>
+<div class='card'><h3>Progress</h3><div id='progress'></div></div>
+<div class='card'><h3>Checklist</h3><div id='checklist'></div>
+<hr><h4>Add Task</h4><input id='taskName' placeholder='Task name'><input id='taskMin' type='number' value='5'><button onclick='addTask()'>Add Task</button></div>
+<div class='card'><h3>Timeline</h3><div id='timeline'></div></div>
+<script>
+const KEY='rtl_project_v1';
+let templates=JSON.parse(localStorage.getItem('rtl_templates'))||[{name:'Work',tasks:[{name:'Shower',minutes:15},{name:'Dress',minutes:10},{name:'Pack Bag',minutes:5},{name:'Buffer',minutes:10}]},{name:'Evening Out',tasks:[{name:'Shower',minutes:15},{name:'Hair',minutes:20},{name:'Dress',minutes:15},{name:'Buffer',minutes:10}]}];
+let tasks=[];
+const event=document.getElementById('event');
+function populate(){event.innerHTML='';templates.forEach((t,i)=>event.innerHTML+=`<option value="${i}">${t.name}</option>`)}
+populate();
+function fmt(m){m=((m%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')}
+function save(){localStorage.setItem(KEY,JSON.stringify({date:new Date().toISOString().split('T')[0],event:event.value,arrival:arrival.value,travel:travel.value,tasks}));localStorage.setItem('rtl_templates',JSON.stringify(templates));}
+function load(){let s=JSON.parse(localStorage.getItem(KEY)||'null');if(!s)return; if(s.date!==new Date().toISOString().split('T')[0]) return; event.value=s.event; arrival.value=s.arrival; travel.value=s.travel; tasks=s.tasks||[]; render();}
+function newPlan(){tasks=JSON.parse(JSON.stringify(templates[event.value].tasks));save();render();}
+function toggle(i){tasks[i].completed=!tasks[i].completed;save();render();}
+function addTask(){const n=taskName.value.trim(); const m=+taskMin.value; if(!n||m<1)return; tasks.push({name:n,minutes:m}); templates[event.value].tasks=tasks.map(t=>({name:t.name,minutes:t.minutes})); save(); render();}
+function delTask(i){tasks.splice(i,1); templates[event.value].tasks=tasks.map(t=>({name:t.name,minutes:t.minutes})); save(); render();}
+function editName(i,v){tasks[i].name=v; templates[event.value].tasks=tasks.map(t=>({name:t.name,minutes:t.minutes})); save();}
+function editMin(i,v){tasks[i].minutes=+v||1; templates[event.value].tasks=tasks.map(t=>({name:t.name,minutes:t.minutes})); save(); render();}
+function render(){if(!arrival.value)return; const [h,m]=arrival.value.split(':').map(Number); const arr=h*60+m; const leave=arr-(+travel.value||0); const rem=tasks.filter(t=>!t.completed).reduce((a,t)=>a+t.minutes,0); const total=tasks.reduce((a,t)=>a+t.minutes,0); const done=tasks.filter(t=>t.completed).reduce((a,t)=>a+t.minutes,0); const start=leave-rem; latest.textContent=fmt(start); progress.innerHTML=`<div>${done}/${total} mins</div><div class='progress'><div class='fill' style='width:${total?done/total*100:0}%'></div></div>`; checklist.innerHTML=''; tasks.forEach((t,i)=>checklist.innerHTML+=`<div class='task'><input type='checkbox' ${t.completed?'checked':''} onchange='toggle(${i})'> <input value="${t.name}" oninput='editName(${i},this.value)' style='width:40%'> <input type='number' value='${t.minutes}' oninput='editMin(${i},this.value)' style='width:70px'> <button onclick='delTask(${i})' style='width:auto'>🗑</button></div>`);
+let run=start; timeline.innerHTML='<div class="timeline">'; tasks.forEach(t=>{ if(t.completed){timeline.innerHTML+=`<div>✓ ${t.name}</div>`} else {timeline.innerHTML+=`<div><b>${fmt(run)}</b> ${t.name}</div>`; run+=t.minutes;} }); timeline.innerHTML+=`<div><b>${fmt(leave)}</b> Leave House</div><div><b>${fmt(arr)}</b> Arrive</div></div>`; status.innerHTML=rem===0?'✅ Ready to leave':`Remaining prep: ${rem} mins`; save(); }
+arrival.onchange=render; travel.oninput=render; event.onchange=newPlan; if(!load()) populate();
+</script></body></html>
